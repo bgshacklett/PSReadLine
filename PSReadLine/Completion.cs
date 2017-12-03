@@ -9,6 +9,7 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Management.Automation;
 using System.Management.Automation.Runspaces;
@@ -306,6 +307,25 @@ namespace Microsoft.PowerShell
                     var length = _tabCompletions.ReplacementLength;
                     if (start < 0 || start > _singleton._buffer.Length) return null;
                     if (length < 0 || length > (_singleton._buffer.Length - start)) return null;
+
+                    // Validate Dotfile Completion:
+                    // If the buffer contains a file system path, we need to
+                    // look for a dot at index 0 in the leaf. If that doesn't
+                    // exist, we should filter out any completion results
+                    // which begin with a dot in their respective leaves.
+                    if (Directory.Exists(Path.GetDirectoryName((_buffer.ToString()))))
+                    {
+                        if (Path.GetFileName(_buffer.ToString()).IndexOf('.') != 0)
+                        {
+                            foreach (var match in _tabCompletions.CompletionMatches.ToArray())
+                            {
+                                if (Path.GetFileName(match.CompletionText).IndexOf('.') == 0)
+                                {
+                                    _tabCompletions.CompletionMatches.Remove(match);
+                                }
+                            }
+                        }
+                    }
 
                     if (_tabCompletions.CompletionMatches.Count > 1)
                     {
